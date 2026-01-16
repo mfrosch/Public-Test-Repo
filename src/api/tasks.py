@@ -6,10 +6,10 @@ Provides CRUD endpoints for task management.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.models.task import Task, TaskCreate, TaskUpdate, Priority, TaskStatus
+from src.models.task import Task, TaskCreate, TaskUpdate, TaskAssignment, Priority, TaskStatus
 from src.models.user import User
 from src.services.task_service import TaskService
-from src.services.auth_service import get_current_user
+from src.services.auth_service import AuthService, get_current_user
 
 router = APIRouter()
 
@@ -140,4 +140,40 @@ async def complete_task(
     return await service.update_task(
         task_id,
         TaskUpdate(status=TaskStatus.COMPLETED)
+    )
+
+
+@router.post("/{task_id}/assign", response_model=Task)
+async def assign_task(
+    task_id: int,
+    assignment: TaskAssignment,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Assign a task to another user.
+
+    Only the task owner or an admin can assign tasks.
+    The target user must exist in the system.
+    """
+    task_service = TaskService()
+    auth_service = AuthService()
+
+    # Get the task
+    task = await task_service.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check permissions
+    if task.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Verify target user exists
+    target_user = await auth_service.get_user_by_id(assignment.assigned_to)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    # Update the task assignment
+    return await task_service.update_task(
+        task_id,
+        TaskUpdate(assigned_to=assignment.assigned_to)
     )

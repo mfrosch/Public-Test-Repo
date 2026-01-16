@@ -31,6 +31,7 @@ class TaskBase(BaseModel):
     description: Optional[str] = Field(None, max_length=2000)
     priority: Priority = Priority.MEDIUM
     due_date: Optional[datetime] = None
+    assigned_to: Optional[int] = Field(None, description="User ID of the assignee")
 
 
 class TaskCreate(TaskBase):
@@ -45,6 +46,12 @@ class TaskUpdate(BaseModel):
     priority: Optional[Priority] = None
     status: Optional[TaskStatus] = None
     due_date: Optional[datetime] = None
+    assigned_to: Optional[int] = Field(None, description="User ID to assign the task to")
+
+
+class TaskAssignment(BaseModel):
+    """Model for assigning a task to a user."""
+    assigned_to: int = Field(..., description="User ID to assign the task to")
 
 
 class Task(TaskBase):
