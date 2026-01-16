@@ -154,9 +154,9 @@ class TaskService:
 
     async def get_task_statistics(self, user_id: int) -> dict:
         """
-        Get task statistics for a user.
+        Get comprehensive task statistics for a user.
 
-        Provides an overview of task counts grouped by status and priority.
+        Provides a detailed overview of task counts grouped by status and priority.
 
         Args:
             user_id: The user's ID.
@@ -209,3 +209,22 @@ class TaskService:
             return_document=True
         )
         return result["seq"]
+
+    async def get_tasks_summary(self, user_id: int) -> dict:
+        """
+        Get a brief summary of tasks for dashboard display.
+
+        Args:
+            user_id: The user's ID.
+
+        Returns:
+            Dictionary with counts for quick overview.
+        """
+        stats = await self.get_task_statistics(user_id)
+        return {
+            "total": stats["total"],
+            "pending": stats["by_status"].get("pending", 0),
+            "in_progress": stats["by_status"].get("in_progress", 0),
+            "completed": stats["by_status"].get("completed", 0),
+            "overdue": stats["overdue_count"],
+        }
