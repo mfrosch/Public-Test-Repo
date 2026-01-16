@@ -152,6 +152,54 @@ class TaskService:
         cursor = db.tasks.find(query)
         return await cursor.to_list(length=100)
 
+    async def get_task_statistics(self, user_id: int) -> dict:
+        """
+        Get task statistics for a user.
+
+        Provides an overview of task counts grouped by status and priority.
+
+        Args:
+            user_id: The user's ID.
+
+        Returns:
+            Dictionary containing:
+            - total: Total number of tasks
+            - by_status: Count per status (pending, in_progress, completed)
+            - by_priority: Count per priority (low, medium, high, urgent)
+            - overdue_count: Number of overdue tasks
+        """
+        db = await get_db()
+
+        # Get all user tasks
+        tasks = await db.tasks.find({"user_id": user_id}).to_list(length=1000)
+
+        # Calculate statistics
+        by_status = {}
+        by_priority = {}
+        overdue_count = 0
+        now = datetime.utcnow()
+
+        for task in tasks:
+            # Count by status
+            status = task.get("status", "pending")
+            by_status[status] = by_status.get(status, 0) + 1
+
+            # Count by priority
+            priority = task.get("priority", "medium")
+            by_priority[priority] = by_priority.get(priority, 0) + 1
+
+            # Count overdue
+            due_date = task.get("due_date")
+            if due_date and due_date < now and status != TaskStatus.COMPLETED:
+                overdue_count += 1
+
+        return {
+            "total": len(tasks),
+            "by_status": by_status,
+            "by_priority": by_priority,
+            "overdue_count": overdue_count,
+        }
+
     async def _get_next_id(self, db) -> int:
         """Generate the next auto-increment ID for tasks."""
         result = await db.counters.find_one_and_update(
