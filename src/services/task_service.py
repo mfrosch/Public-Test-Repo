@@ -228,3 +228,59 @@ class TaskService:
             "completed": stats["by_status"].get("completed", 0),
             "overdue": stats["overdue_count"],
         }
+
+    async def archive_completed_tasks(
+        self,
+        user_id: int,
+        older_than_days: int = 30
+    ) -> dict:
+        """
+        Archive completed tasks older than a specified number of days.
+
+        Moves completed tasks to an archive collection to keep the main
+        tasks collection performant. Archived tasks can still be retrieved
+        but are excluded from normal queries.
+
+        Args:
+            user_id: The user's ID.
+            older_than_days: Archive tasks completed more than this many days ago.
+                Defaults to 30 days.
+
+        Returns:
+            Dictionary containing:
+            - archived_count: Number of tasks archived
+            - archived_ids: List of archived task IDs
+        """
+        from datetime import timedelta
+
+        db = await get_db()
+        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+
+        # Find completed tasks older than cutoff
+        query = {
+            "user_id": user_id,
+            "status": TaskStatus.COMPLETED,
+            "updated_at": {"$lt": cutoff_date}
+        }
+
+        tasks_to_archive = await db.tasks.find(query).to_list(length=1000)
+
+        if not tasks_to_archive:
+            return {"archived_count": 0, "archived_ids": []}
+
+        # Add archive metadata
+        archived_ids = []
+        for task in tasks_to_archive:
+            task["archived_at"] = datetime.utcnow()
+            archived_ids.append(task["id"])
+
+        # Insert into archive collection
+        await db.tasks_archive.insert_many(tasks_to_archive)
+
+        # Remove from main collection
+        await db.tasks.delete_many({"id": {"$in": archived_ids}})
+
+        return {
+            "archived_count": len(archived_ids),
+            "archived_ids": archived_ids
+        }
