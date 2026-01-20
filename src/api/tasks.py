@@ -143,6 +143,32 @@ async def complete_task(
     )
 
 
+@router.post("/{task_id}/duplicate", response_model=Task, status_code=201)
+async def duplicate_task(
+    task_id: int,
+    new_title: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Duplicate an existing task.
+
+    Creates a copy of the specified task with status reset to PENDING.
+    The duplicate is assigned to the current user.
+    Optionally provide a new title for the duplicate.
+    """
+    service = TaskService()
+    task = await service.duplicate_task(
+        task_id=task_id,
+        user_id=current_user.id,
+        new_title=new_title
+    )
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Source task not found")
+
+    return task
+
+
 @router.post("/{task_id}/assign", response_model=Task)
 async def assign_task(
     task_id: int,

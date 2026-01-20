@@ -193,11 +193,18 @@ class TaskService:
             if due_date and due_date < now and status != TaskStatus.COMPLETED:
                 overdue_count += 1
 
+        # Calculate completion rate
+        completion_rate = 0.0
+        if tasks:
+            completed_count = by_status.get(TaskStatus.COMPLETED, 0)
+            completion_rate = round(completed_count / len(tasks) * 100, 1)
+
         return {
             "total": len(tasks),
             "by_status": by_status,
             "by_priority": by_priority,
             "overdue_count": overdue_count,
+            "completion_rate": completion_rate,
         }
 
     async def _get_next_id(self, db) -> int:
@@ -228,6 +235,48 @@ class TaskService:
             "completed": stats["by_status"].get("completed", 0),
             "overdue": stats["overdue_count"],
         }
+
+    async def duplicate_task(
+        self,
+        task_id: int,
+        user_id: int,
+        new_title: Optional[str] = None
+    ) -> Optional[Task]:
+        """
+        Create a duplicate of an existing task.
+
+        Creates a copy of the task with a new ID and reset status.
+        Useful for recurring tasks or templates.
+
+        Args:
+            task_id: The ID of the task to duplicate.
+            user_id: The user creating the duplicate.
+            new_title: Optional new title. Defaults to "Copy of {original_title}".
+
+        Returns:
+            The newly created task, or None if source task not found.
+        """
+        source_task = await self.get_task(task_id)
+        if not source_task:
+            return None
+
+        db = await get_db()
+        now = datetime.utcnow()
+
+        new_task = Task(
+            id=await self._get_next_id(db),
+            title=new_title or f"Copy of {source_task.title}",
+            description=source_task.description,
+            priority=source_task.priority,
+            due_date=source_task.due_date,
+            user_id=user_id,
+            status=TaskStatus.PENDING,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await db.tasks.insert_one(new_task.model_dump())
+        return new_task
 
     async def archive_completed_tasks(
         self,
