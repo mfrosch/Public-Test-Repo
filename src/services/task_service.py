@@ -278,49 +278,6 @@ class TaskService:
         await db.tasks.insert_one(new_task.model_dump())
         return new_task
 
-    async def bulk_update_status(
-        self,
-        task_ids: List[int],
-        new_status: TaskStatus,
-        user_id: int
-    ) -> dict:
-        """
-        Update the status of multiple tasks at once.
-
-        Efficiently updates multiple tasks in a single operation.
-        Only updates tasks that belong to the specified user.
-
-        Args:
-            task_ids: List of task IDs to update.
-            new_status: The new status to set for all tasks.
-            user_id: The user's ID (for ownership verification).
-
-        Returns:
-            Dictionary containing:
-            - updated_count: Number of tasks actually updated
-            - skipped_ids: List of task IDs that were skipped (not owned by user)
-        """
-        db = await get_db()
-        now = datetime.utcnow()
-
-        # Update only tasks owned by the user
-        result = await db.tasks.update_many(
-            {"id": {"$in": task_ids}, "user_id": user_id},
-            {"$set": {"status": new_status, "updated_at": now}}
-        )
-
-        # Find which tasks were skipped
-        updated_tasks = await db.tasks.find(
-            {"id": {"$in": task_ids}, "user_id": user_id}
-        ).to_list(length=len(task_ids))
-        updated_ids = {t["id"] for t in updated_tasks}
-        skipped_ids = [tid for tid in task_ids if tid not in updated_ids]
-
-        return {
-            "updated_count": result.modified_count,
-            "skipped_ids": skipped_ids
-        }
-
     async def archive_completed_tasks(
         self,
         user_id: int,
