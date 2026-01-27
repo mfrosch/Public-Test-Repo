@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.tasks import router as tasks_router
 from src.api.auth import router as auth_router
+from src.api.comments import router as comments_router
 from src.services.database import init_db
 
 app = FastAPI(
@@ -29,6 +30,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(tasks_router, prefix="/api/tasks", tags=["Tasks"])
+app.include_router(comments_router, prefix="/api/comments", tags=["Comments"])
 
 
 @app.on_event("startup")
